@@ -10,6 +10,7 @@ RoCorAudioProcessor::RoCorAudioProcessor()
 	: m_SineTable(meta::BandlimitedWavetable<float, ROCOR_OSC_TABLE_SIZE>::makeSin())
 	, m_SineOsc(m_SineTable)
 	, m_Ramp(10, 20000, 1)
+	, m_InputView(1)
 {}
 RoCorAudioProcessor::~RoCorAudioProcessor() {}
 
@@ -97,8 +98,11 @@ bool RoCorAudioProcessor::isBusesLayoutSupported (const BusesLayout& layouts) co
 
 void RoCorAudioProcessor::processBlock(AudioBuffer<float> &buffer, MidiBuffer &midiMessages)
 {
+	m_InputView.pushBuffer(buffer.getArrayOfReadPointers(), 1, buffer.getNumSamples());
+
     if (m_IsCapturing) 
-	{		
+	{
+		p_Capture->copyFrom(0, m_CaptureIndex, buffer, 0, 0, buffer.getNumSamples());
 		for (auto samp = 0; samp < buffer.getNumSamples(); samp++)
 		{
 			if (m_Ramp.getProgress() < 1)
@@ -107,8 +111,14 @@ void RoCorAudioProcessor::processBlock(AudioBuffer<float> &buffer, MidiBuffer &m
 				auto value = m_SineOsc.tick();
 				for (auto chan = 0; chan < buffer.getNumChannels(); chan++) { buffer.setSample(chan, samp, value); }
 			}
-			else { m_IsCapturing = false;  }
+			else 
+			{
+				m_IsCapturing = false; 
+			}
 		}
+
+		p_Reference->copyFrom(0, m_CaptureIndex, buffer, 0, 0, buffer.getNumSamples());
+		m_CaptureIndex += buffer.getNumSamples();
     }
 
     else if (m_IsProcessing) {
@@ -133,14 +143,16 @@ void RoCorAudioProcessor::setStateInformation(const void *data, int sizeInBytes)
 void RoCorAudioProcessor::startImpulseCapture()
 {
     m_IsCapturing = true;
-    p_Capture.reset(new juce::AudioBuffer<float>(1, 0));
+	m_CaptureIndex = 0;
+	const auto preBufferLength = getSampleRate() * 20;
+    p_Capture.reset(new juce::AudioBuffer<float>(1, preBufferLength));
+	p_Reference.reset(new juce::AudioBuffer<float>(1, preBufferLength));
 	m_Ramp.reset();
 }
 
 void RoCorAudioProcessor::stopImpulseCapture()
 {
     m_IsCapturing = false;
-
 }
 
 const juce::AudioBuffer<float>*
