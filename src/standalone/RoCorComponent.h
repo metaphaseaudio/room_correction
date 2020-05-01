@@ -4,9 +4,9 @@
 #pragma once
 
 #include <JuceHeader.h>
-#include <gooey/RoCorLAF.h>
-#include <guts/RoCorAudioProcessor.h>
-#include <gooey/RoCorAudioProcessorEditor.h>
+#include <rocor/gooey/RoCorLAF.h>
+#include <rocor/guts/RoCorAudioProcessor.h>
+#include <rocor/gooey/RoCorAudioProcessorEditor.h>
 
 class RoCorComponent
     : public juce::Component

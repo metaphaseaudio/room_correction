@@ -1,11 +1,11 @@
 /*
-  ==============================================================================
+ ==============================================================================
 
-    This file was auto-generated!
+   This file was auto-generated!
 
-    It contains the basic framework code for a JUCE plugin processor.
+   It contains the basic framework code for a JUCE plugin processor.
 
-  ==============================================================================
+ ==============================================================================
 */
 
 #pragma once
@@ -14,32 +14,47 @@
 #include <meta/generators/LinearRamp.h>
 #include <meta/dsp/WavetableOscillator.h>
 #include <meta/dsp/BandlimitedWavetable.h>
+#include <meta/generators/complementary_sequence.h>
+#include "IRCalculator.h"
 
+#include <meta/generators/SineSweep.h>
 //==============================================================================
 /**
 */
 
 #define ROCOR_OSC_TABLE_SIZE 48000
+#define ROCOR_PAUSE_SECS 0.5f
 #define ROCOR_SWEEP_SECS 5
 #define ROCOR_NOISE_SECS 5
-#define ROCOR_GOLAY_SECS 0
+#define ROCOR_GOLAY_N 15
 
 
 class RoCorAudioProcessor
     : public juce::AudioProcessor
+    , public juce::ChangeBroadcaster
+    , public juce::ChangeListener
 {
 public:
+    typedef enum {
+        NONE,
+        GOLAY_A,
+        GOLAY_B,
+        PINK,
+        SWEEP
+    } playbackType;
+
     //==============================================================================
     RoCorAudioProcessor();
     ~RoCorAudioProcessor();
 
     //==============================================================================
     void prepareToPlay(double sampleRate, int samplesPerBlock) override;
+
     void releaseResources() override;
 
-   #ifndef JucePlugin_PreferredChannelConfigurations
+#ifndef JucePlugin_PreferredChannelConfigurations
     bool isBusesLayoutSupported (const BusesLayout& layouts) const override;
-   #endif
+#endif
 
     void processBlock(juce::AudioBuffer<float>&, juce::MidiBuffer&) override;
 
@@ -51,45 +66,64 @@ public:
     const juce::String getName() const override;
 
     bool acceptsMidi() const override;
+
     bool producesMidi() const override;
+
     bool isMidiEffect() const override;
+
     double getTailLengthSeconds() const override;
 
     //==============================================================================
     int getNumPrograms() override;
+
     int getCurrentProgram() override;
+
     void setCurrentProgram(int index) override;
+
     const juce::String getProgramName(int index) override;
+
     void changeProgramName(int index, const juce::String& newName) override;
 
     //==============================================================================
     void getStateInformation(juce::MemoryBlock& destData) override;
+
     void setStateInformation(const void* data, int sizeInBytes) override;
 
+    void changeListenerCallback(juce::ChangeBroadcaster* source) override;
+
     void startImpulseCapture();
-    void stopImpulseCapture();
-	const bool isCapturing() const { return m_IsCapturing; }
 
-    const juce::AudioBuffer<float>* calculateImpulse(
-            juce::AudioBuffer<float>* capture, juce::AudioBuffer<float>* ref) const;
+    void startImpulseCalc() { m_IRCalc.run(); };
 
+    bool isCapturing() const { return m_IsCapturing; }
 
-	juce::AudioVisualiserComponent m_InputView;
+    void setImpulseLength(size_t x) { m_Impulse.setSize(m_Impulse.getNumChannels(), x, true, true); }
+    void setImpulseChans(int x)     { m_Impulse.setSize(x, m_Impulse.getNumSamples(),  true, true); }
+
+    const juce::AudioBuffer<float>& getImpulse() const { return m_Impulse; };
+
+    juce::AudioVisualiserComponent m_InputView;
 
 private:
-    //==============================================================================
+    void resetCapture(int chan);
+
     bool m_IsCapturing = false;
+    bool m_IsPlayingBack = false;
     bool m_IsProcessing = false;
-    
-	std::array<float, ROCOR_OSC_TABLE_SIZE> m_SineTable;
-	meta::WavetableOscilator<float, ROCOR_OSC_TABLE_SIZE> m_SineOsc;
-	meta::LinearRamp m_Ramp;
+    int m_CaptureChan = 0;
 
-	size_t m_CaptureIndex;
-	std::unique_ptr<juce::AudioBuffer<float>> p_Capture;
-	std::unique_ptr<juce::AudioBuffer<float>> p_Reference;
+    size_t m_CaptureIndex;
+    size_t m_ReferenceIndex;
 
-    std::vector<std::unique_ptr<juce::AudioBuffer<float>>> m_Impulses;
+    juce::AudioBuffer<float> m_Capture;
+    juce::AudioBuffer<float> m_Reference;
 
+    std::vector<juce::AudioBuffer<float>> m_CaptureBank;
+    juce::AudioBuffer<float> m_Impulse;
+    meta::SineSweep<float, ROCOR_OSC_TABLE_SIZE> m_Sweep;
+    rocor::IRCalculator m_IRCalc;
+
+    void generateReference();
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (RoCorAudioProcessor);
+
 };

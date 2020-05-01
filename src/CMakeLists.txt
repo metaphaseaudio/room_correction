@@ -44,7 +44,7 @@ LIST(SORT ROCOR_SOURCE)
 
 add_library(rocorlib STATIC ${ROCOR_SOURCE})
 set_target_properties(rocorlib PROPERTIES POSITION_INDEPENDENT_CODE ON)
-target_include_directories(rocorlib INTERFACE ${CMAKE_CURRENT_SOURCE_DIR}/ROCOR)
+target_include_directories(rocorlib INTERFACE ${CMAKE_CURRENT_SOURCE_DIR})
 
 # This corresponds with the VST plug-in itself.
 add_library(RoCor MODULE ${JUCE_PLUGIN_SOURCE})
