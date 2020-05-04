@@ -13,7 +13,7 @@ RoCorComponent::RoCorComponent(juce::AudioDeviceManager& devicemgr)
     editor.reset(new RoCorAudioProcessorEditor(processor));
     setLookAndFeel(m_Laf.get());
     addAndMakeVisible(editor.get());
-    setBounds(0, 0, 500, 600);
+    setBounds(0, 0, 400, 650);
 }
 
 void RoCorComponent::resized()

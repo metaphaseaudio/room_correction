@@ -1,9 +1,10 @@
 #pragma once
 
 #include <JuceHeader.h>
+#include <meta/gooey/RadioGrid.h>
 #include <meta/gooey/WaveformComponent.h>
 #include "../guts/RoCorAudioProcessor.h"
-#include <meta/gooey/RadioGrid.h>
+#include "placement_map/PlacmentMapComponent.h"
 
 //==============================================================================
 /**
@@ -38,7 +39,9 @@ private:
     RoCorAudioProcessor& processor;
 	juce::AudioFormatManager m_FormatMgr;
 	meta::WaveformComponent m_ImpulseView;
+	PlacmentMapComponent m_PlacementView;
 	meta::RadioGrid<juce::TextButton, 1, 2> m_ImpulseSelect;
+    juce::TextButton mNewTest;
 	juce::TextButton mStartTest;
     juce::TextButton mStartCalc;
 

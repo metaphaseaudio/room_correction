@@ -16,6 +16,7 @@ using namespace juce;
 //==============================================================================
 RoCorAudioProcessorEditor::RoCorAudioProcessorEditor(RoCorAudioProcessor& p)
     : AudioProcessorEditor(&p)
+    , mNewTest("New IR")
     , mStartTest("Start Test")
     , mStartCalc("Run IR Calc")
     , processor(p)
@@ -23,16 +24,18 @@ RoCorAudioProcessorEditor::RoCorAudioProcessorEditor(RoCorAudioProcessor& p)
     , m_LabelChanCount("Chan Count Label", "Channel Arrangement")
     , m_ChanCount("Chan Count")
 {
-    setSize(500, 600);
+    setSize(400, 650);
     processor.addChangeListener(this);
     addAndMakeVisible(&processor.m_InputView);
     addAndMakeVisible(&mStartCalc);
+    addAndMakeVisible(m_PlacementView);
 
     addAndMakeVisible(&mStartTest);
     mStartTest.addListener(this);
 
     addAndMakeVisible(m_ImpulseView);
 	m_ImpulseView.setClip(processor.getImpulse(), processor.getImpulse().getNumSamples());
+
 
 	addAndMakeVisible(m_LabelChanCount);
     addAndMakeVisible(m_ChanCount);
@@ -69,7 +72,10 @@ void RoCorAudioProcessorEditor::resized()
     mStartCalc.setBounds(bottom_buttons.removeFromRight(100));
 
     processor.m_InputView.setBounds(control_space.removeFromBottom(100));
-    m_ImpulseView.setBounds(control_space.removeFromTop(200));
+    m_ImpulseView.setBounds(control_space.removeFromTop(100));
+    control_space.removeFromTop(5);
+    control_space.removeFromBottom(5);
+    m_PlacementView.setBounds(control_space);
 
 }
 
