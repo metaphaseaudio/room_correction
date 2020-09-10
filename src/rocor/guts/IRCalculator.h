@@ -5,6 +5,7 @@
 
 #include <JuceHeader.h>
 #include <meta/util/simd_ops.h>
+#include "CapturePosition.h"
 
 
 namespace rocor
@@ -14,12 +15,23 @@ namespace rocor
         , public juce::ChangeBroadcaster
     {
     public:
-        IRCalculator(const std::vector<juce::AudioBuffer<float>>& captureBank, const juce::AudioBuffer<float>& reference, int chans, int samps);
-        void run();
+        IRCalculator(const rocor::CaptureMap<juce::AudioBuffer<float>>& captureBank, const juce::AudioBuffer<float>& reference, int chans, int samps);
+        void run() override;
+
         juce::AudioBuffer<float> getCalculatedIR() { return m_Impulse; };
 
+        void rocor::IRCalculator::saveImpulse(juce::AudioFormatWriter* writer);
+        void rocor::IRCalculator::loadImpulse(juce::AudioFormatReader* reader);
+
+        void saveIndividualImpulses(juce::AudioFormat* fmt, const juce::File& dir, int sampleRate);
+        void loadIndividualImpulses(juce::AudioFormat* fmt, const juce::File& dir);
+
+        double progress;
+        const rocor::CaptureMap<juce::AudioBuffer<float>>& getCalculatedIRMap() const { return m_Calculated; }
+
     private:
-        const std::vector<juce::AudioBuffer<float>>& r_CaptureBank;
+        const rocor::CaptureMap<juce::AudioBuffer<float>>& r_CaptureBank;
+        rocor::CaptureMap<juce::AudioBuffer<float>> m_Calculated;
         const juce::AudioBuffer<float>& r_Reference;
         juce::AudioBuffer<float> m_Impulse;
     };

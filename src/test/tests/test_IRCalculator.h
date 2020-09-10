@@ -6,6 +6,7 @@
 #include <rocor/guts/IRCalculator.h>
 
 
+
 TEST(IRCalculatorTest, mono)
 {
     std::array<float, 3> refarr = { 1, 0, 0 };

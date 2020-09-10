@@ -2,6 +2,7 @@
 // Created by Matt on 4/18/2020.
 //
 
+#include <cassert>
 #include "IRCalculator.h"
 
 
@@ -23,8 +24,7 @@ static T calc_norm_factor(const T* x, size_t n)
     }
 
     T tmp[4];
-    const auto tmpStore = (meta::simd<T>::isAligned(tmp)) ? Mode::store_aligned :
-                          Mode::store_unaligned;
+    const auto tmpStore = (meta::simd<T>::isAligned(tmp)) ? Mode::store_aligned : Mode::store_unaligned;
 
     tmpStore(tmp, x_pow);
     T x_sum = tmp[0] + tmp[1] + tmp[2] + tmp[3];
@@ -41,11 +41,10 @@ static T calc_norm_factor(const T* x, size_t n)
 template <typename T>
 static juce::AudioBuffer<T> calculate_impulse(juce::AudioBuffer<T>& cap, const juce::AudioBuffer<T>& ref, size_t impulse_samps)
 {
-
-    auto tmp = juce::AudioBuffer<float>(1, cap.getNumSamples() + ref.getNumSamples());
-    auto out = juce::AudioBuffer<float>(1, impulse_samps);
-    std::memset(tmp.getArrayOfWritePointers()[0], 0 , sizeof(T*) * tmp.getNumSamples());
-    std::memset(out.getArrayOfWritePointers()[0], 0 , sizeof(T*) * out.getNumSamples());
+    const auto total_length = cap.getNumSamples() + ref.getNumSamples(); // impulse_samps
+    auto tmp = juce::AudioBuffer<float>(1, total_length);
+    auto out = juce::AudioBuffer<float>(cap.getNumChannels(), total_length);
+    out.clear();
 
     // Prep reference stream
     juce::AudioBuffer<float> ref_cp(ref);
@@ -57,44 +56,119 @@ static juce::AudioBuffer<T> calculate_impulse(juce::AudioBuffer<T>& cap, const j
     conv.prepare(spec);
     conv.copyAndLoadImpulseResponseFromBuffer(ref_cp, 1, false, false, false, ref.getNumSamples());
 
-    // Convolve
-    juce::dsp::AudioBlock<float> in_block(cap);
-    juce::dsp::AudioBlock<float> out_block(tmp);
-    juce::dsp::ProcessContextNonReplacing<float> context(in_block, out_block);
-    conv.process(context);
-
-    // Normalize
+    // Calc normalization denominator
     float denom = std::sqrt(calc_norm_factor(ref.getArrayOfReadPointers()[0], ref.getNumSamples()));
-    meta::simd<float>::div(tmp.getArrayOfWritePointers()[0], denom, tmp.getNumSamples());
 
-    // Move to output
-    auto start_index = ref.getNumSamples() - 1;
-    std::memcpy(out.getArrayOfWritePointers()[0]
-            , tmp.getArrayOfReadPointers()[0] + start_index
-            , sizeof(out.getArrayOfWritePointers()[0]) * impulse_samps);
+    for (auto chan = out.getNumChannels(); --chan >= 0;)
+    {
+        // Clear temp
+        tmp.clear();
+        auto tmpptr = tmp.getArrayOfWritePointers()[0];
+        auto outptr = out.getArrayOfWritePointers()[chan];
+
+        // Convolve
+        juce::dsp::AudioBlock<float> in_block(cap.getArrayOfWritePointers() + chan, 1, 0, cap.getNumSamples());
+        juce::dsp::AudioBlock<float> out_block(tmp);
+        juce::dsp::ProcessContextNonReplacing<float> context(in_block, out_block);
+        conv.process(context);
+
+        // Normalize
+        meta::simd<float>::div(tmpptr, denom, tmp.getNumSamples());
+
+        // Move to output, trimmed
+        auto start_index = 0;//ref.getNumSamples() - 1;
+        out.copyFrom(chan, 0, tmp, 0, start_index, total_length);
+    }
 
     return out;
 }
 
 ///////////////////////////////////////////////////////////////////////////////
 rocor::IRCalculator::IRCalculator
-(const std::vector<juce::AudioBuffer<float>>& captureBank, const juce::AudioBuffer<float>& reference, int chans, int samps)
+(const rocor::CaptureMap<juce::AudioBuffer<float>>& captureBank, const juce::AudioBuffer<float>& reference, int chans, int samps)
     : juce::Thread("IRcalc")
     , r_CaptureBank(captureBank)
     , r_Reference(reference)
     , m_Impulse(chans, samps)
-{
-    m_Impulse.clear();
-}
+    , progress(0)
+{ m_Impulse.clear(); }
 
 void rocor::IRCalculator::run()
 {
-    for (auto& capture : r_CaptureBank)
+    m_Impulse.clear();
+    progress = 0;
+
+    const auto capture_count = float(r_CaptureBank.size() * m_Impulse.getNumChannels());
+
+    if (capture_count == 0)
     {
-        juce::AudioBuffer<float> tmp = capture;
-        tmp.clear();
-        m_Impulse = calculate_impulse(tmp, r_Reference, m_Impulse.getNumSamples());
+        sendChangeMessage();
+        return;
     }
+
+    float done = 0;
+
+    for (auto capture : r_CaptureBank)
+    {
+        auto pos = capture.first;
+        m_Calculated[pos] = calculate_impulse(capture.second, r_Reference, m_Impulse.getNumSamples());
+
+        for (auto chan = m_Impulse.getNumChannels(); --chan >= 0;)
+        {
+            m_Impulse.addFrom(chan, 0, m_Calculated.at(pos), chan, 0, m_Impulse.getNumSamples());
+            progress = ++done / capture_count;
+        }
+    }
+
+    m_Impulse.applyGain(1.0f / capture_count);
     sendChangeMessage();
 }
 
+void rocor::IRCalculator::saveImpulse(juce::AudioFormatWriter* writer)
+{
+    writer->writeFromAudioSampleBuffer(m_Impulse, 0, m_Impulse.getNumSamples());
+}
+
+void rocor::IRCalculator::loadImpulse(juce::AudioFormatReader* reader)
+{
+    m_Impulse.setSize(reader->numChannels, reader->lengthInSamples);
+    reader->read(m_Impulse.getArrayOfWritePointers(), reader->numChannels, 0, reader->lengthInSamples);
+}
+
+void rocor::IRCalculator::saveIndividualImpulses(juce::AudioFormat* fmt, const juce::File& dir, int sampleRate)
+{
+    for (int i = rocor::capture_position_names.size(); --i >= 0;)
+    {
+        const auto name = rocor::capture_position_names[i];
+        const auto pos = rocor::ordered_capture_positions[i];
+
+        if (!m_Calculated.count(pos)) { continue;}
+
+        const auto outfile = dir.getChildFile(name).withFileExtension(fmt->getFileExtensions()[0]);
+        outfile.create();
+
+        auto outstream = outfile.createOutputStream();
+        const auto& buffer = m_Calculated.at(pos);  // r_CaptureBank.at(pos);
+        std::unique_ptr<juce::AudioFormatWriter> writer(fmt->createWriterFor(outstream.release(), sampleRate, buffer.getNumChannels(), 32, NULL, 0));
+        writer->writeFromAudioSampleBuffer(buffer, 0, m_Impulse.getNumSamples());
+    }
+}
+
+void rocor::IRCalculator::loadIndividualImpulses(juce::AudioFormat* fmt, const juce::File& dir)
+{
+    for (auto i = rocor::capture_position_names.size(); --i >= 0;)
+    {
+        const auto name = rocor::capture_position_names[i];
+        const auto pos = rocor::ordered_capture_positions[i];
+
+        if (m_Calculated.at(pos).getNumSamples() != m_Impulse.getNumSamples())
+        {
+            continue;
+        };
+
+        auto in = dir.getChildFile(name).withFileExtension(fmt->getFileExtensions()[0]).createInputStream();
+        std::unique_ptr<juce::AudioFormatReader> reader(fmt->createReaderFor(in.get(), false));
+        m_Calculated[pos] = juce::AudioBuffer<float>(reader->numChannels, reader->lengthInSamples);
+        reader->read(m_Calculated.at(pos).getArrayOfWritePointers(), reader->numChannels, 0, reader->lengthInSamples);
+    }
+}

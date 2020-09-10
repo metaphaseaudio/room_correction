@@ -16,6 +16,7 @@
 #include <meta/dsp/BandlimitedWavetable.h>
 #include <meta/generators/complementary_sequence.h>
 #include "IRCalculator.h"
+#include "CapturePosition.h"
 
 #include <meta/generators/SineSweep.h>
 //==============================================================================
@@ -44,7 +45,7 @@ public:
     } playbackType;
 
     //==============================================================================
-    RoCorAudioProcessor();
+        RoCorAudioProcessor();
     ~RoCorAudioProcessor();
 
     //==============================================================================
@@ -91,37 +92,46 @@ public:
 
     void changeListenerCallback(juce::ChangeBroadcaster* source) override;
 
-    void startImpulseCapture();
+    void startCapture(rocor::CapturePosition position);
+    rocor::CapturePosition getCapturePosition() const
+    {
+        return m_CapturePosition;
+    };
 
-    void startImpulseCalc() { m_IRCalc.run(); };
+    void stopCapture();
 
+    void startImpulseCalc() { m_IRCalc.startThread(); };
     bool isCapturing() const { return m_IsCapturing; }
-
+    rocor::IRCalculator& getIRCalc() { return m_IRCalc; }
     void setImpulseLength(size_t x) { m_Impulse.setSize(m_Impulse.getNumChannels(), x, true, true); }
     void setImpulseChans(int x)     { m_Impulse.setSize(x, m_Impulse.getNumSamples(),  true, true); }
 
+
     const juce::AudioBuffer<float>& getImpulse() const { return m_Impulse; };
 
+
     juce::AudioVisualiserComponent m_InputView;
+    const rocor::CaptureMap<juce::AudioBuffer<float>>& getCaptures() const { return m_CaptureBank; }
 
 private:
-    void resetCapture(int chan);
+    rocor::IRCalculator m_IRCalc;
 
+    void resetCapture(int chan);
     bool m_IsCapturing = false;
     bool m_IsPlayingBack = false;
     bool m_IsProcessing = false;
     int m_CaptureChan = 0;
 
+    rocor::CapturePosition m_CapturePosition = rocor::CapturePosition::FRONT_L;
     size_t m_CaptureIndex;
+
     size_t m_ReferenceIndex;
-
     juce::AudioBuffer<float> m_Capture;
-    juce::AudioBuffer<float> m_Reference;
 
-    std::vector<juce::AudioBuffer<float>> m_CaptureBank;
+    juce::AudioBuffer<float> m_Reference;
+    rocor::CaptureMap<juce::AudioBuffer<float>> m_CaptureBank;
     juce::AudioBuffer<float> m_Impulse;
     meta::SineSweep<float, ROCOR_OSC_TABLE_SIZE> m_Sweep;
-    rocor::IRCalculator m_IRCalc;
 
     void generateReference();
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (RoCorAudioProcessor);

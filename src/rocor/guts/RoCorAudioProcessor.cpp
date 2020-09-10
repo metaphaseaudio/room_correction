@@ -46,7 +46,7 @@ void RoCorAudioProcessor::releaseResources() {}
 
 void RoCorAudioProcessor::processBlock(AudioBuffer<float> &buffer, MidiBuffer &midiMessages)
 {
-	m_InputView.pushBuffer(buffer.getArrayOfReadPointers(), 1, buffer.getNumSamples());
+    m_InputView.pushBuffer(buffer.getArrayOfReadPointers(), 1, buffer.getNumSamples());
 
 	if (m_IsCapturing)
     {
@@ -61,23 +61,33 @@ void RoCorAudioProcessor::processBlock(AudioBuffer<float> &buffer, MidiBuffer &m
             if (nextChan < m_Impulse.getNumChannels()) { resetCapture(nextChan); }
             else
             {
-                m_CaptureBank.emplace_back(m_Capture);
+                juce::AudioBuffer<float> copy = m_Capture;
+                m_CaptureBank.emplace(std::make_pair(m_CapturePosition, copy));
                 m_Capture.clear();
+                m_IsProcessing = true;
+                sendChangeMessage();
             }
         }
     }
 
     if (m_IsPlayingBack)
-	{
+    {
         buffer.clear();
-        const auto nSamps = std::min<size_t>(m_Reference.getNumSamples() -  m_ReferenceIndex, buffer.getNumSamples());
-		buffer.copyFrom(m_CaptureChan, 0, m_Reference, 0, m_ReferenceIndex, nSamps);
-		m_ReferenceIndex += buffer.getNumSamples();
-		m_IsCapturing = true;
-		if (m_ReferenceIndex >= m_Reference.getNumSamples()) { m_IsPlayingBack = false; }
+        const auto nSamps = std::min<size_t>(m_Reference.getNumSamples() - m_ReferenceIndex, buffer.getNumSamples());
+        buffer.copyFrom(m_CaptureChan, 0, m_Reference, 0, m_ReferenceIndex, nSamps);
+        m_ReferenceIndex += buffer.getNumSamples();
+        m_IsCapturing = true;
+        if (m_ReferenceIndex >= m_Reference.getNumSamples()) { m_IsPlayingBack = false; }
     }
 
-    if (m_IsProcessing) { ScopedNoDenormals noDenormals; }
+    if (m_IsProcessing)
+    {
+        ScopedNoDenormals noDenormals;
+
+        // TODO: This is a dumb hack. Obviously.
+        buffer.clear();
+    }
+
 }
 
 //==============================================================================
@@ -98,19 +108,18 @@ void RoCorAudioProcessor::resetCapture(int chan)
     m_IsPlayingBack = true;
 }
 
-void RoCorAudioProcessor::startImpulseCapture()
+void RoCorAudioProcessor::startCapture(rocor::CapturePosition position)
 {
     m_IsCapturing = false;
     m_IsProcessing = false;
     m_Impulse.clear();
     m_Capture = juce::AudioBuffer<float>(m_Impulse.getNumChannels(), m_Reference.getNumSamples());
+    m_CapturePosition = position;
     resetCapture(0);
 }
 
 void RoCorAudioProcessor::changeListenerCallback(juce::ChangeBroadcaster* source)
-{
-    m_Impulse = m_IRCalc.getCalculatedIR();
-}
+    { m_Impulse = m_IRCalc.getCalculatedIR(); }
 
 
 void RoCorAudioProcessor::generateReference()
@@ -120,7 +129,7 @@ void RoCorAudioProcessor::generateReference()
     const auto noiseSamps = ROCOR_NOISE_SECS * getSampleRate();
     const auto sweepSamps = ROCOR_SWEEP_SECS * getSampleRate();
     const auto nyquist = getSampleRate() / 2;
-    m_Reference.setSize(1, golaySamps + pauseSamps + golaySamps + pauseSamps + noiseSamps + pauseSamps + sweepSamps + pauseSamps);
+    m_Reference.setSize(1, golaySamps);// + pauseSamps + golaySamps + pauseSamps + noiseSamps + pauseSamps + sweepSamps + pauseSamps);
     m_Reference.clear();
 
     size_t samp_i = 0;
@@ -136,14 +145,18 @@ void RoCorAudioProcessor::generateReference()
     m_Sweep.reset();
 
     for (const auto& samp : golay_a)    { m_Reference.setSample(0, samp_i, samp);           samp_i++; }
-    for (const auto& samp : golay_b)    { m_Reference.setSample(0, samp_i, samp);           samp_i++; } samp_i += pauseSamps;
-    for (const auto& samp : golay_a)    { m_Reference.setSample(0, samp_i, samp);           samp_i++; }
-    for (const auto& samp : golay_b)    { m_Reference.setSample(0, samp_i, -samp);          samp_i++; } samp_i += pauseSamps;
-    for (int i = noiseSamps; --i >= 0;) { m_Reference.setSample(0, samp_i, noise.tick());   samp_i++; } samp_i += pauseSamps;
-    for (int i = noiseSamps; --i >= 0;) { m_Reference.setSample(0, samp_i, m_Sweep.tick()); samp_i++; }
+//    for (const auto& samp : golay_b)    { m_Reference.setSample(0, samp_i, samp);           samp_i++; } samp_i += pauseSamps;
+//    for (const auto& samp : golay_a)    { m_Reference.setSample(0, samp_i, samp);           samp_i++; }
+//    for (const auto& samp : golay_b)    { m_Reference.setSample(0, samp_i, -samp);          samp_i++; } samp_i += pauseSamps;
+//    for (int i = noiseSamps; --i >= 0;) { m_Reference.setSample(0, samp_i, noise.tick());   samp_i++; } samp_i += pauseSamps;
+//    for (int i = noiseSamps; --i >= 0;) { m_Reference.setSample(0, samp_i, m_Sweep.tick()); samp_i++; }
 }
 
-
+void RoCorAudioProcessor::stopCapture()
+{
+    m_IsCapturing = false;
+    m_IsPlayingBack = false;
+}
 
 //==============================================================================
 // This creates new instances of the plugin..
