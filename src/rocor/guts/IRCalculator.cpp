@@ -51,7 +51,7 @@ static juce::AudioBuffer<T> calculate_impulse(juce::AudioBuffer<T>& cap, const j
     ref_cp.reverse(0, ref_cp.getNumSamples());
 
     // Prep convolution
-    juce::dsp::ProcessSpec spec = { 1, std::max(cap.getNumSamples(), ref.getNumSamples()) * 2, 1 };
+    juce::dsp::ProcessSpec spec = { 1, static_cast<juce::uint32>(std::max(cap.getNumSamples(), ref.getNumSamples()) * 2), 1 };
     juce::dsp::Convolution conv;
     conv.prepare(spec);
     conv.copyAndLoadImpulseResponseFromBuffer(ref_cp, 1, false, false, false, ref.getNumSamples());
@@ -76,8 +76,8 @@ static juce::AudioBuffer<T> calculate_impulse(juce::AudioBuffer<T>& cap, const j
         meta::simd<float>::div(tmpptr, denom, tmp.getNumSamples());
 
         // Move to output, trimmed
-        auto start_index = 0;//ref.getNumSamples() - 1;
-        out.copyFrom(chan, 0, tmp, 0, start_index, total_length);
+        auto offset = ref.getNumSamples() * chan;
+        out.copyFrom(chan, 0, tmp, 0, offset, total_length);
     }
 
     return out;

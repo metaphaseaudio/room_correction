@@ -50,7 +50,6 @@ RoCorAudioProcessorEditor::RoCorAudioProcessorEditor(RoCorAudioProcessor& p)
     m_Tabs.addTab("Captures", juce::Colours::black, &m_Captures, false);
     m_Captures.setRowHeight(60);
     m_Impulses.setRowHeight(60);
-    juce::TableListBoxModel
     m_Tabs.addTab("IRs", juce::Colours::black, &m_Impulses, false);
     m_PlacementView.addChangeListener(this);
     addAndMakeVisible(m_Tabs);
