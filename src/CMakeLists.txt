@@ -8,28 +8,13 @@ add_definitions(-DROCOR_VERSION="${ROCOR_VERSION_MAJOR}.${ROCOR_VERSION_MINOR}")
 include(${CMAKE_CURRENT_SOURCE_DIR}/shared/MUDS/cmake_snippets/CPP14Boilerplate.cmake)
 
 #------------------------------------------------------------------------------
+# Build the VST SDK
+#------------------------------------------------------------------------------
+add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/shared/vst3sdk)
+#------------------------------------------------------------------------------
 # Build the JUCE library
 #------------------------------------------------------------------------------
-set(JUCE_APP_CONFIG ${CMAKE_CURRENT_SOURCE_DIR}/juce_includes/AppConfig.h)
-set(JUCE_PATH ${CMAKE_CURRENT_SOURCE_DIR}/shared/JUCE)
-include_directories(${CMAKE_CURRENT_SOURCE_DIR}/juce_includes)
-
-set(JUCE_ENABLE_PLUGIN_VST ON)
-set(JUCE_ENABLE_AUDIO_BASICS ON)
-set(JUCE_ENABLE_AUDIO_FORMATS ON)
-set(JUCE_ENABLE_AUDIO_PROCESSORS ON)
-set(JUCE_ENABLE_AUDIO_DEVICES ON)
-set(JUCE_ENABLE_AUDIO_UTILS ON)
-set(JUCE_ENABLE_CRYPTOGRAPHY ON)
-set(JUCE_ENABLE_DATA_STRUCTURES ON)
-set(JUCE_ENABLE_DSP ON)
-set(JUCE_ENABLE_EVENTS ON)
-set(JUCE_ENABLE_GRAPHICS ON)
-set(JUCE_ENABLE_GUI_BASICS ON)
-set(JUCE_ENABLE_GUI_EXTRA ON)
-
-include(${CMAKE_CURRENT_SOURCE_DIR}/shared/MUDS/cmake_snippets/CompileJUCE.cmake)
-
+add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/shared/JUCE)
 #------------------------------------------------------------------------------
 # Build Metaphase Shared Libraries
 #------------------------------------------------------------------------------
@@ -38,35 +23,41 @@ add_subdirectory(shared/metaphase_core)
 #------------------------------------------------------------------------------
 # Build ROCOR
 #------------------------------------------------------------------------------
+juce_add_plugin(ROCOR
+        VERSION 1.0
+        COMPANY_NAME Metaphase
+        IS_SYNTH FALSE
+        NEEDS_MIDI_INPUT FALSE
+        VST_NUM_MIDI_INS 0
+        PLUGIN_MANUFACTURER_CODE Mtap
+        PLUGIN_CODE MROC
+        COPY_PLUGIN_AFTER_BUILD TRUE
+        FORMATS VST3 Standalone
+        PRODUCT_NAME "ROCOR")
+
+juce_generate_juce_header(ROCOR)
+
 FILE(GLOB_RECURSE ROCOR_SOURCE ${CMAKE_CURRENT_SOURCE_DIR}/rocor/*.cpp
                                ${CMAKE_CURRENT_SOURCE_DIR}/rocor/*.h)
 LIST(SORT ROCOR_SOURCE)
 
-add_library(rocorlib STATIC ${ROCOR_SOURCE})
-set_target_properties(rocorlib PROPERTIES POSITION_INDEPENDENT_CODE ON)
-target_include_directories(rocorlib INTERFACE ${CMAKE_CURRENT_SOURCE_DIR})
+target_sources(ROCOR PRIVATE ${ROCOR_SOURCE})
+target_compile_definitions(ROCOR
+    PUBLIC
+        JUCE_WEB_BROWSER=0
+        JUCE_USE_CURL=0
+        JUCE_VST3_CAN_REPLACE_VST2=0
+)
 
-# This corresponds with the VST plug-in itself.
-add_library(RoCor MODULE ${JUCE_PLUGIN_SOURCE})
-
-set(ROCOR_SOURCE
-    ${ROCOR_SOURCE}
-    ${JUCE_PLUGIN_SOURCE})
-
-set(ROCOR_LIBS
-    ${JUCE_LIBS}
-    ${META_SHARED_LIBS}
-    juce
-    metaphase_core)
-
-target_link_libraries(rocorlib ${ROCOR_LIBS} )
-target_link_libraries(RoCor rocorlib)
-
-add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/standalone)
-
-if(CMAKE_THREAD_LIBS_INIT)
-    target_link_libraries(RoCor ${CMAKE_THREAD_LIBS_INIT})
-endif()
+target_link_libraries(ROCOR
+    PUBLIC
+        juce::juce_audio_utils
+        juce::juce_recommended_config_flags
+        juce::juce_recommended_lto_flags
+        juce::juce_recommended_warning_flags
+    PUBLIC
+        metaphase_core
+)
 
 option(BUILD_TESTS "BUILD_TESTS" OFF)
 if (BUILD_TESTS)
