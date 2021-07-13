@@ -48,13 +48,17 @@ static juce::AudioBuffer<T> calculate_impulse(juce::AudioBuffer<T>& cap, const j
 
     // Prep reference stream
     juce::AudioBuffer<float> ref_cp(ref);
-    ref_cp.reverse(0, ref_cp.getNumSamples());
+//    ref_cp.reverse(0, ref_cp.getNumSamples());
 
     // Prep convolution
-    juce::dsp::ProcessSpec spec = { 1, static_cast<juce::uint32>(std::max(cap.getNumSamples(), ref.getNumSamples()) * 2), 1 };
+//    juce::dsp::ProcessSpec spec = { 1, static_cast<juce::uint32>(std::max(cap.getNumSamples(), ref.getNumSamples()) * 2), 1 };
+    juce::dsp::ProcessSpec spec = { 1, static_cast<juce::uint32>(total_length), 1 };
     juce::dsp::Convolution conv;
     conv.prepare(spec);
-    conv.copyAndLoadImpulseResponseFromBuffer(ref_cp, 1, false, false, false, ref.getNumSamples());
+    conv.loadImpulseResponse(std::move(ref_cp), 1,
+                             juce::dsp::Convolution::Stereo::no,
+                             juce::dsp::Convolution::Trim::no,
+                             juce::dsp::Convolution::Normalise::no);
 
     // Calc normalization denominator
     float denom = std::sqrt(calc_norm_factor(ref.getArrayOfReadPointers()[0], ref.getNumSamples()));
@@ -63,8 +67,6 @@ static juce::AudioBuffer<T> calculate_impulse(juce::AudioBuffer<T>& cap, const j
     {
         // Clear temp
         tmp.clear();
-        auto tmpptr = tmp.getArrayOfWritePointers()[0];
-        auto outptr = out.getArrayOfWritePointers()[chan];
 
         // Convolve
         juce::dsp::AudioBlock<float> in_block(cap.getArrayOfWritePointers() + chan, 1, 0, cap.getNumSamples());
@@ -73,7 +75,7 @@ static juce::AudioBuffer<T> calculate_impulse(juce::AudioBuffer<T>& cap, const j
         conv.process(context);
 
         // Normalize
-        meta::simd<float>::div(tmpptr, denom, tmp.getNumSamples());
+        meta::simd<float>::div(tmp.getArrayOfWritePointers()[0], denom, tmp.getNumSamples());
 
         // Move to output, trimmed
         auto offset = ref.getNumSamples() * chan;
@@ -171,4 +173,9 @@ void rocor::IRCalculator::loadIndividualImpulses(juce::AudioFormat* fmt, const j
         m_Calculated[pos] = juce::AudioBuffer<float>(reader->numChannels, reader->lengthInSamples);
         reader->read(m_Calculated.at(pos).getArrayOfWritePointers(), reader->numChannels, 0, reader->lengthInSamples);
     }
+}
+
+juce::AudioBuffer<float> rocor::IRCalculator::calc_impulse(juce::AudioBuffer<float>& x, juce::AudioBuffer<float>& y)
+{
+    return calculate_impulse<float>(x, y, 1024);
 }

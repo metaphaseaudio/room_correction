@@ -26,6 +26,8 @@ namespace rocor
         void saveIndividualImpulses(juce::AudioFormat* fmt, const juce::File& dir, int sampleRate);
         void loadIndividualImpulses(juce::AudioFormat* fmt, const juce::File& dir);
 
+        static juce::AudioBuffer<float> calc_impulse(juce::AudioBuffer<float>& x, juce::AudioBuffer<float>& y);
+
         double progress;
         const rocor::CaptureMap<juce::AudioBuffer<float>>& getCalculatedIRMap() const { return m_Calculated; }
 
