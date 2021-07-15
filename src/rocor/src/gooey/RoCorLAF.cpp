@@ -2,6 +2,6 @@
 // Created by mzapp on 4/15/18.
 //
 
-#include "RoCorLAF.h"
+#include <rocor/gooey/RoCorLAF.h>
 
 using namespace juce;

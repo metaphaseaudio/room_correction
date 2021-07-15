@@ -2,7 +2,7 @@
 // Created by Matt on 8/2/2020.
 //
 
-#include "ThumbnailViewListBoxModel.h"
+#include <rocor/gooey/ThumbnailViewListBoxModel.h>
 
 rocor::ThumbnailViewListBoxModel::ThumbnailViewListBoxModel(const rocor::CaptureMap<juce::AudioBuffer<float>>& map, int sampleRate)
     : r_CaptureMap(map)

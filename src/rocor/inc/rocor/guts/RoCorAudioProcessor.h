@@ -10,9 +10,9 @@
 
 #pragma once
 
-#include <JuceHeader.h>
+#include <juce_audio_processors/juce_audio_processors.h>
+#include <juce_audio_utils/juce_audio_utils.h>
 #include <meta/generators/LinearRamp.h>
-#include <meta/dsp/WavetableOscillator.h>
 #include <meta/dsp/BandlimitedWavetable.h>
 #include <meta/generators/complementary_sequence.h>
 #include "IRCalculator.h"

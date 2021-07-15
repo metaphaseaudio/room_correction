@@ -3,7 +3,10 @@
 //
 
 #include <cassert>
-#include "IRCalculator.h"
+#include <meta/util/simd_ops.h>
+#include <meta/generators/complementary_sequence.h>
+#include <meta/dsp/FindInSignal.h>
+#include <rocor/guts/IRCalculator.h>
 
 
 template <typename T>
@@ -37,6 +40,23 @@ static T calc_norm_factor(const T* x, size_t n)
     return x_sum;
 }
 
+
+static juce::AudioBuffer<float> calculate_impulse_from_golay(juce::AudioBuffer<float>& capture, size_t golay_n = 16)
+{
+    auto golay_pair = meta::generate_golay_dynamic<float>(golay_n);
+    juce::AudioBuffer<float> a, b;
+    auto a_data = golay_pair.first.data();
+    auto b_data = golay_pair.second.data();
+
+    a.setDataToReferTo(&a_data, 1, golay_pair.first.size());
+    b.setDataToReferTo(&b_data, 1, golay_pair.second.size());
+    meta::dsp::MultiChanConvolve golay_a(std::move(a), 512);
+    meta::dsp::MultiChanConvolve golay_b(std::move(b), 512);
+
+    auto a_range = meta::dsp::find_in_signal(golay_a, capture);
+    auto b_range = meta::dsp::find_in_signal(golay_b, capture);
+
+}
 
 template <typename T>
 static juce::AudioBuffer<T> calculate_impulse(juce::AudioBuffer<T>& cap, const juce::AudioBuffer<T>& ref, size_t impulse_samps)
@@ -86,14 +106,25 @@ static juce::AudioBuffer<T> calculate_impulse(juce::AudioBuffer<T>& cap, const j
 }
 
 ///////////////////////////////////////////////////////////////////////////////
-rocor::IRCalculator::IRCalculator
-(const rocor::CaptureMap<juce::AudioBuffer<float>>& captureBank, const juce::AudioBuffer<float>& reference, int chans, int samps)
+rocor::IRCalculator::IRCalculator(const rocor::CaptureMap<juce::AudioBuffer<float>>& captureBank, int golay_n, int chans, int samps)
     : juce::Thread("IRcalc")
     , r_CaptureBank(captureBank)
-    , r_Reference(reference)
     , m_Impulse(chans, samps)
     , progress(0)
-{ m_Impulse.clear(); }
+{
+    // Initialize the golay bursts
+    auto golay_pair = meta::generate_golay_dynamic<float>(golay_n);
+    juce::AudioBuffer<float> a, b;
+    auto a_data = golay_pair.first.data();
+    auto b_data = golay_pair.second.data();
+    a.setDataToReferTo(&a_data, 1, golay_pair.first.size());
+    b.setDataToReferTo(&b_data, 1, golay_pair.second.size());
+    m_GolayA = std::make_unique<meta::dsp::MultiChanConvolve>(std::move(a), 512);
+    m_GolayB = std::make_unique<meta::dsp::MultiChanConvolve>(std::move(b), 512);
+
+    // Ready the impulse for calcualtion
+    m_Impulse.clear();
+}
 
 void rocor::IRCalculator::run()
 {
@@ -113,7 +144,7 @@ void rocor::IRCalculator::run()
     for (auto capture : r_CaptureBank)
     {
         auto pos = capture.first;
-        m_Calculated[pos] = calculate_impulse(capture.second, r_Reference, m_Impulse.getNumSamples());
+//        m_Calculated[pos] =
 
         for (auto chan = m_Impulse.getNumChannels(); --chan >= 0;)
         {
@@ -178,4 +209,13 @@ void rocor::IRCalculator::loadIndividualImpulses(juce::AudioFormat* fmt, const j
 juce::AudioBuffer<float> rocor::IRCalculator::calc_impulse(juce::AudioBuffer<float>& x, juce::AudioBuffer<float>& y)
 {
     return calculate_impulse<float>(x, y, 1024);
+}
+
+juce::AudioBuffer<float> rocor::IRCalculator::calc_mono(juce::AudioBuffer<float>& x)
+{
+    juce::AudioBuffer<float> rv;
+    auto a_range = meta::dsp::find_in_signal(*m_GolayA, x);
+    auto b_range = meta::dsp::find_in_signal(*m_GolayB, x);
+
+    return rv;
 }

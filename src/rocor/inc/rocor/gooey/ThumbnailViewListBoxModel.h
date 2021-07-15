@@ -3,7 +3,7 @@
 //
 
 #pragma once
-#include <JuceHeader.h>
+#include <juce_gui_basics/juce_gui_basics.h>
 #include <meta/gooey/WaveformComponent.h>
 #include "../guts/CapturePosition.h"
 

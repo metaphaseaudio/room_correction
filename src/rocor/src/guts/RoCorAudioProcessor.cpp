@@ -3,19 +3,20 @@
 #include <juce_audio_utils/juce_audio_utils.h>
 #include <meta/dsp/PinkRandom.h>
 
-#include "RoCorAudioProcessor.h"
-#include "../gooey/RoCorAudioProcessorEditor.h"
+#include <rocor/guts/RoCorAudioProcessor.h>
+#include <rocor/gooey/RoCorAudioProcessorEditor.h>
 
 using namespace juce;
 //==============================================================================
 RoCorAudioProcessor::RoCorAudioProcessor()
-	: m_InputView(1)
+	: AudioProcessor(BusesProperties())
+	, m_InputView(1)
 	, m_Impulse(2, 22050)
 	, m_IsPlayingBack(false)
 	, m_IsCapturing(false)
 	, m_IsProcessing(false)
-	, m_Sweep(10, 22000, 5 * 48000)
-	, m_IRCalc(m_CaptureBank, m_Reference, 2, 48000)
+	, m_Sweep(48000, 10, 22000, 5 * 48000)
+	, m_IRCalc(m_CaptureBank, 16, 2, 48000)
 {}
 
 RoCorAudioProcessor::~RoCorAudioProcessor() {}
@@ -43,6 +44,31 @@ void RoCorAudioProcessor::prepareToPlay(double sampleRate, int samplesPerBlock)
 }
 
 void RoCorAudioProcessor::releaseResources() {}
+
+#ifndef JucePlugin_PreferredChannelConfigurations
+bool RoCorAudioProcessor::isBusesLayoutSupported (const BusesLayout& layouts) const
+{
+#if JucePlugin_IsMidiEffect
+    ignoreUnused (layouts);
+    return true;
+#else
+    // This is the place where you check if the layout is supported.
+    // In this template code we only support mono or stereo.
+    if (layouts.getMainOutputChannelSet() != AudioChannelSet::mono()
+        && layouts.getMainOutputChannelSet() != AudioChannelSet::stereo())
+        return false;
+
+    // This checks if the input layout matches the output layout
+#if ! JucePlugin_IsSynth
+    if (layouts.getMainOutputChannelSet() != layouts.getMainInputChannelSet())
+        return false;
+#endif
+
+    return true;
+#endif
+}
+#endif
+
 
 void RoCorAudioProcessor::processBlock(AudioBuffer<float> &buffer, MidiBuffer &midiMessages)
 {

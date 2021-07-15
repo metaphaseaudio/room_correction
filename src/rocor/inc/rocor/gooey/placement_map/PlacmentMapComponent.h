@@ -2,7 +2,7 @@
 // Created by Matt on 5/3/2020.
 //
 #pragma once
-#include <JuceHeader.h>
+#include <juce_gui_basics/juce_gui_basics.h>
 #include "PlacementIcon.h"
 #include "../../guts/CapturePosition.h"
 

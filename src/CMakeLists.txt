@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.2)
+cmake_minimum_required(VERSION 3.19)
 
 project(ROCOR)
 set(ROCOR_VERSION_MAJOR 1)
@@ -42,6 +42,9 @@ FILE(GLOB_RECURSE ROCOR_SOURCE ${CMAKE_CURRENT_SOURCE_DIR}/rocor/*.cpp
 LIST(SORT ROCOR_SOURCE)
 
 target_sources(ROCOR PRIVATE ${ROCOR_SOURCE})
+target_include_directories(ROCOR INTERFACE ${CMAKE_CURRENT_SOURCE_DIR}/rocor/inc/)
+
+include_directories(${CMAKE_CURRENT_SOURCE_DIR}/rocor/inc/ )
 target_compile_definitions(ROCOR
     PUBLIC
         JUCE_WEB_BROWSER=0

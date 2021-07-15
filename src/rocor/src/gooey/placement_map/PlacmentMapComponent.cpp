@@ -2,7 +2,7 @@
 // Created by Matt on 5/3/2020.
 //
 
-#include "PlacmentMapComponent.h"
+#include <rocor/gooey/placement_map/PlacmentMapComponent.h>
 
 PlacmentMapComponent::PlacmentMapComponent()
 {

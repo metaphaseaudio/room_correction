@@ -8,8 +8,8 @@
   ==============================================================================
 */
 
-#include "../guts/RoCorAudioProcessor.h"
-#include "RoCorAudioProcessorEditor.h"
+#include <rocor/guts/RoCorAudioProcessor.h>
+#include <rocor/gooey/RoCorAudioProcessorEditor.h>
 
 using namespace juce;
 
