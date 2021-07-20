@@ -115,7 +115,6 @@ rocor::IRCalculator::IRCalculator(
     , progress(0)
     , m_GolayCalc(golay_n)
 {
-    // Ready the impulse for calcualtion
     m_Impulse.clear();
 }
 
@@ -132,8 +131,6 @@ void rocor::IRCalculator::run()
         return;
     }
 
-    float done = 0;
-
     juce::AudioBuffer<float> tmp(r_CaptureBank.size() + 1, m_Ref.getNumSamples() + m_Impulse.getNumSamples());
     tmp.clear();
     tmp.copyFrom(0, 0, m_Ref, 0, 0, m_Ref.getNumSamples()); // do this to get all the propagation delay
@@ -145,19 +142,12 @@ void rocor::IRCalculator::run()
     }
 
     auto calculated = m_GolayCalc.calculate(tmp, 30, m_Impulse.getNumSamples());
-//
-//    chan_i = 1;
-//    for (auto capture : r_CaptureBank)
-//    {
-//        auto pos = capture.first;
-//        m_Calculated[pos] =
-//
-//        for (auto chan = m_Impulse.getNumChannels(); --chan >= 0;)
-//        {
-//            m_Impulse.addFrom(chan, 0, m_Calculated.at(pos), chan, 0, m_Impulse.getNumSamples());
-//            progress = ++done / capture_count;
-//        }
-//    }
+
+    chan_i = 1;
+    for (auto calc : meta::enumerate(m_Calculated))
+    {
+        std::get<1>(calc).second.copyFrom(0, 0, calculated, std::get<0>(calc), 0, calculated.getNumSamples());
+    }
 
     m_Impulse.applyGain(1.0f / capture_count);
     sendChangeMessage();

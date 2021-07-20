@@ -9,7 +9,7 @@
 using namespace juce;
 //==============================================================================
 RoCorAudioProcessor::RoCorAudioProcessor()
-	: AudioProcessor(BusesProperties())
+	: AudioProcessor(BusesProperties().withInput("Input", AudioChannelSet::stereo(), true).withOutput("Output", AudioChannelSet::stereo(), true))
 	, m_InputView(1)
 	, m_Impulse(2, 22050)
 	, m_IsPlayingBack(false)
@@ -155,7 +155,7 @@ void RoCorAudioProcessor::generateReference()
     const auto noiseSamps = ROCOR_NOISE_SECS * getSampleRate();
     const auto sweepSamps = ROCOR_SWEEP_SECS * getSampleRate();
     const auto nyquist = getSampleRate() / 2;
-    m_Reference.setSize(1, golaySamps+ pauseSamps + golaySamps + pauseSamps);// + noiseSamps + pauseSamps + sweepSamps + pauseSamps);
+    m_Reference.setSize(1, golaySamps + pauseSamps + golaySamps + pauseSamps);// + noiseSamps + pauseSamps + sweepSamps + pauseSamps);
     m_Reference.clear();
 
     size_t samp_i = 0;
@@ -171,7 +171,7 @@ void RoCorAudioProcessor::generateReference()
     m_Sweep.reset();
 
     for (const auto& samp : golay_a)    { m_Reference.setSample(0, samp_i, samp);           samp_i++; } samp_i += pauseSamps;
-    for (const auto& samp : golay_b)    { m_Reference.setSample(0, samp_i, samp);           samp_i++; } samp_i += pauseSamps;
+    for (const auto& samp : golay_b)    { m_Reference.setSample(0, samp_i, samp);           samp_i++; } // samp_i += pauseSamps;
 //    for (const auto& samp : golay_a)    { m_Reference.setSample(0, samp_i, samp);           samp_i++; }
 //    for (const auto& samp : golay_b)    { m_Reference.setSample(0, samp_i, -samp);          samp_i++; } samp_i += pauseSamps;
 //    for (int i = noiseSamps; --i >= 0;) { m_Reference.setSample(0, samp_i, noise.tick());   samp_i++; } samp_i += pauseSamps;
