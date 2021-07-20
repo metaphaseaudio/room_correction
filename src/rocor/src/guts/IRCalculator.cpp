@@ -112,7 +112,6 @@ rocor::IRCalculator::IRCalculator(
     , r_CaptureBank(captureBank)
     , m_Ref(ref)
     , m_Impulse(chans, samps)
-    , progress(0)
     , m_GolayCalc(golay_n)
 {
     m_Impulse.clear();
@@ -121,7 +120,6 @@ rocor::IRCalculator::IRCalculator(
 void rocor::IRCalculator::run()
 {
     m_Impulse.clear();
-    progress = 0;
 
     const auto capture_count = float(r_CaptureBank.size() * m_Impulse.getNumChannels());
 
@@ -144,9 +142,18 @@ void rocor::IRCalculator::run()
     auto calculated = m_GolayCalc.calculate(tmp, 30, m_Impulse.getNumSamples());
 
     chan_i = 1;
-    for (auto calc : meta::enumerate(m_Calculated))
+    for (auto chan_pos : meta::enumerate(r_CaptureBank))
     {
-        std::get<1>(calc).second.copyFrom(0, 0, calculated, std::get<0>(calc), 0, calculated.getNumSamples());
+        // This esoteric-looking block of code:
+        //  1. allocates long-term memory for the calculated IR for this channel
+        //  2. copies the temp info into the permanent block
+        m_Calculated[std::get<1>(chan_pos).first] = juce::AudioBuffer<float>(1, calculated.getNumSamples());
+        m_Calculated.at(std::get<1>(chan_pos).first).copyFrom(0, 0, calculated, std::get<0>(chan_pos) + 1, 0, calculated.getNumSamples());
+
+        // TODO: Maybe get rid of this normalization? Not sure how we're going
+        //  to weight things yet
+        auto gain = 1.0f / m_Calculated.at(std::get<1>(chan_pos).first).getMagnitude(0, calculated.getNumSamples());
+        m_Calculated.at(std::get<1>(chan_pos).first).applyGain(gain);
     }
 
     m_Impulse.applyGain(1.0f / capture_count);
@@ -209,6 +216,7 @@ juce::AudioBuffer<float> rocor::IRCalculator::calc_impulse(juce::AudioBuffer<flo
 
 
 rocor::GolayIRCalculator::GolayIRCalculator(int golay_n)
+    : m_Progress(1.0)
 {
     auto golay_pair = meta::generate_golay_dynamic<float>(golay_n);
     juce::AudioBuffer<float> a, b;
@@ -224,13 +232,15 @@ rocor::GolayIRCalculator::GolayIRCalculator(int golay_n)
 
 juce::AudioBuffer<float> rocor::GolayIRCalculator::calculate(juce::AudioBuffer<float>& x, int pre_roll, int len)
 {
+    m_Progress = 0;
+
     // allocate memory for temporary, in-place calculations
     juce::AudioBuffer<float> convolved_result(x.getNumChannels(), x.getNumSamples() + m_GolayA->get_ir_length());
 
     // allocate memory for storing the maxes
     juce::AudioBuffer<float> tmp;
     std::vector<int> bursts_i;
-    for (auto c = x.getNumChannels(); --c >= 0;)
+    for (auto c = x.getNumChannels(); --c >= 0; m_Progress = float(x.getNumChannels() - c) / x.getNumChannels())
     {
         auto chan_ptr = x.getArrayOfWritePointers()[c];
         tmp.setDataToReferTo(&chan_ptr, 1, x.getNumSamples());

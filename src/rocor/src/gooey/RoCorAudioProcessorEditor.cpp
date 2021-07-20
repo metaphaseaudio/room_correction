@@ -28,7 +28,7 @@ RoCorAudioProcessorEditor::RoCorAudioProcessorEditor(RoCorAudioProcessor& p)
     , m_ImpulsesModel(processor.getIRCalc().getCalculatedIRMap())
     , m_Captures("Captures", &m_CapturesModel)
     , m_Impulses("Impulses", &m_ImpulsesModel)
-    , m_Progress(processor.getIRCalc().progress)
+    , m_Progress(processor.getIRCalc().getProgress())
     , m_SemiModalMask(juce::Colours::black.withAlpha(0.5f))
     , m_Tabs(juce::TabbedButtonBar::Orientation::TabsAtTop)
 {

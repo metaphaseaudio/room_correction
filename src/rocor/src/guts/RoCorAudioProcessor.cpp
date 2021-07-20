@@ -16,7 +16,7 @@ RoCorAudioProcessor::RoCorAudioProcessor()
 	, m_IsCapturing(false)
 	, m_IsProcessing(false)
 	, m_Sweep(48000, 10, 22000, 5 * 48000)
-	, m_IRCalc(m_CaptureBank, m_Reference, 16, 2, 48000)
+	, m_IRCalc(m_CaptureBank, m_Reference, ROCOR_GOLAY_N, 2, 48000)
 {}
 
 RoCorAudioProcessor::~RoCorAudioProcessor() {}

@@ -18,7 +18,10 @@ namespace rocor
     public:
         explicit GolayIRCalculator(int golay_n);
         juce::AudioBuffer<float> calculate(juce::AudioBuffer<float>& x, int pre_roll, int len);
+        double& getProgress() { return m_Progress; }
+
     private:
+        double m_Progress;
         std::unique_ptr<meta::dsp::MultiChanConvolve> m_GolayA, m_GolayB;
     };
 
@@ -44,12 +47,10 @@ namespace rocor
 
         static juce::AudioBuffer<float> calc_impulse(juce::AudioBuffer<float>& x, juce::AudioBuffer<float>& y);
 
-        double progress;
         const rocor::CaptureMap<juce::AudioBuffer<float>>& getCalculatedIRMap() const { return m_Calculated; }
 
+        double& getProgress() { return m_GolayCalc.getProgress(); }
     private:
-
-
         const rocor::CaptureMap<juce::AudioBuffer<float>>& r_CaptureBank;
         rocor::CaptureMap<juce::AudioBuffer<float>> m_Calculated;
         const juce::AudioBuffer<float>& m_Ref;
