@@ -12,12 +12,26 @@
 
 namespace rocor
 {
+
+    class GolayIRCalculator
+    {
+    public:
+        explicit GolayIRCalculator(int golay_n);
+        juce::AudioBuffer<float> calculate(juce::AudioBuffer<float>& x, int pre_roll, int len);
+    private:
+        std::unique_ptr<meta::dsp::MultiChanConvolve> m_GolayA, m_GolayB;
+    };
+
     class IRCalculator
         : public juce::Thread
         , public juce::ChangeBroadcaster
     {
     public:
-        IRCalculator(const rocor::CaptureMap<juce::AudioBuffer<float>>& captureBank, int golay_n, int chans, int samps);
+        IRCalculator(
+                const rocor::CaptureMap<juce::AudioBuffer<float>>& captureBank,
+                const juce::AudioBuffer<float>& ref,
+                int golay_n, int chans, int samps
+        );
         void run() override;
 
         juce::AudioBuffer<float> getCalculatedIR() { return m_Impulse; };
@@ -30,16 +44,17 @@ namespace rocor
 
         static juce::AudioBuffer<float> calc_impulse(juce::AudioBuffer<float>& x, juce::AudioBuffer<float>& y);
 
-        juce::AudioBuffer<float> calc_mono(juce::AudioBuffer<float>& x);
-
         double progress;
         const rocor::CaptureMap<juce::AudioBuffer<float>>& getCalculatedIRMap() const { return m_Calculated; }
 
     private:
+
+
         const rocor::CaptureMap<juce::AudioBuffer<float>>& r_CaptureBank;
         rocor::CaptureMap<juce::AudioBuffer<float>> m_Calculated;
+        const juce::AudioBuffer<float>& m_Ref;
         juce::AudioBuffer<float> m_Impulse;
 
-        std::unique_ptr<meta::dsp::MultiChanConvolve> m_GolayA, m_GolayB;
+        GolayIRCalculator m_GolayCalc;
     };
 }

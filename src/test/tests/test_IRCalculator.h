@@ -9,100 +9,10 @@
 #include <rocor/guts/IRCalculator.h>
 
 
-class GolayIRCalculator
-{
-public:
-    GolayIRCalculator(int golay_n)
-    {
-        auto golay_pair = meta::generate_golay_dynamic<float>(golay_n);
-        juce::AudioBuffer<float> a, b;
-        auto a_data = golay_pair.first.data();
-        auto b_data = golay_pair.second.data();
-        a.setDataToReferTo(&a_data, 1, golay_pair.first.size());
-        b.setDataToReferTo(&b_data, 1, golay_pair.second.size());
-        a.reverse(0, a.getNumSamples());
-        b.reverse(0, b.getNumSamples());
-        m_GolayA = std::make_unique<meta::dsp::MultiChanConvolve>(std::move(a), 512);
-        m_GolayB = std::make_unique<meta::dsp::MultiChanConvolve>(std::move(b), 512);
-    }
-
-    juce::AudioBuffer<float> calculate(juce::AudioBuffer<float>& x, int pre_roll, int len)
-    {
-        // allocate memory for temporary, in-place calculations
-        juce::AudioBuffer<float> convolved_result(x.getNumChannels(), x.getNumSamples() + m_GolayA->get_ir_length());
-
-        // allocate memory for storing the maxes
-        juce::AudioBuffer<float> tmp;
-        std::vector<int> bursts_i(x.getNumChannels());
-        for (auto c = x.getNumChannels(); --c >= 0;)
-        {
-            auto chan_ptr = x.getArrayOfWritePointers()[c];
-            tmp.setDataToReferTo(&chan_ptr, 1, x.getNumSamples());
-
-            auto a = m_GolayA->convolve(tmp);
-            auto b = m_GolayB->convolve(tmp);
-
-            // Locate the peak of the impulse, work backwards (we're reversed).
-            // also, these are mono. don't try to grab the channel.
-            auto a_ptr = a.getArrayOfWritePointers()[0];
-            auto b_ptr = b.getArrayOfWritePointers()[0];
-
-            // find the start of each impulse
-            float* a_max = meta::argmax(a_ptr, a_ptr + a.getNumSamples());
-            auto a_max_i = a_max - a_ptr;
-            float* b_max = meta::argmax(b_ptr, b_ptr + b.getNumSamples());
-            auto b_max_i = b_max - b_ptr;
-
-            jassert(a_max_i != b_max_i); // This should really be impossible
-
-            auto impulse_i = std::max(a_max_i, b_max_i);
-
-            // figure out what's first (max, again, because they who are last
-            // shall be first)
-            std::pair<float*, float*> first_burst = a_max_i >= b_max_i ? std::make_pair(a_ptr, a_max) : std::make_pair(b_ptr, b_max);
-            std::pair<float*, float*> second_burst = a_max_i < b_max_i ? std::make_pair(a_ptr, a_max) : std::make_pair(b_ptr, b_max);
-
-            auto burst_distance = std::abs(a_max_i - b_max_i);
-            auto total_available_pre_roll = tmp.getNumSamples() - impulse_i;
-
-            jassert(total_available_pre_roll > pre_roll);
-
-            // Do all the math to manage the averaging/normalization here so
-            // that the second pass is just logic around cutting/moving.
-            convolved_result.copyFrom(c, 0, first_burst.first, convolved_result.getNumSamples(), 0.5f / m_GolayA->get_ir_length());
-            convolved_result.addFrom(c, burst_distance, second_burst.first, tmp.getNumSamples() - burst_distance, 0.5f / m_GolayA->get_ir_length());
-
-            bursts_i[c] = impulse_i;
-        }
-
-        auto last_burst_sample = *meta::argmax(bursts_i.begin(), bursts_i.end());
-        auto first_burst_sample = *meta::argmin(bursts_i.begin(), bursts_i.end());
-        auto propagation_delay = last_burst_sample - first_burst_sample;
-
-        auto total_length = len + pre_roll + propagation_delay;
-        auto copy_start = first_burst_sample - pre_roll;
-
-        // allocate memory for impulse + pre-roll + any inter-channel
-        // propagation delay
-        juce::AudioBuffer<float> rv(x.getNumChannels(), total_length);
-
-        // We do need to take the time to clear here due to the possiblity of
-        // propogation delay.
-        rv.clear();
-
-        for (auto c = x.getNumChannels(); --c >= 0;) { rv.copyFrom(c, 0, convolved_result, c, copy_start, total_length); }
-        return rv;
-    }
-
-private:
-    std::unique_ptr<meta::dsp::MultiChanConvolve> m_GolayA, m_GolayB;
-};
-
-
 TEST(IRCalculatorTest, golay)
 {
     // Setup the IR
-    juce::AudioBuffer<float> test_ir(2, 5);
+    juce::AudioBuffer<float> test_ir(3, 5);
     test_ir.clear();
     test_ir.setSample(0, 0, 1.0f);
     test_ir.setSample(1, 3, 0.5f);
@@ -112,18 +22,19 @@ TEST(IRCalculatorTest, golay)
     int golay_n = 2;
     int gap_samps = 5;
     auto golay_pair = meta::generate_golay_dynamic<float>(golay_n);
-    juce::AudioBuffer<float> base_signal(2, (gap_samps * 3) + std::pow(2, golay_n + 1));
+    juce::AudioBuffer<float> base_signal(test_ir.getNumChannels(), (gap_samps * 3) + std::pow(2, golay_n + 1));
 
     base_signal.clear();
     base_signal.copyFrom(0, gap_samps, golay_pair.first.data(), golay_pair.first.size());
     base_signal.copyFrom(0, gap_samps + golay_pair.first.size() + gap_samps, golay_pair.second.data(), golay_pair.second.size());
     base_signal.copyFrom(1, 0, base_signal, 0, 0, base_signal.getNumSamples());
+    base_signal.copyFrom(2, 0, base_signal, 0, 0, base_signal.getNumSamples());
 
     auto test_signal = pre_conv.convolve(base_signal);
 
     // set up the calculator and run
-    auto ir_calc = GolayIRCalculator(golay_n);
-    auto ir = ir_calc.calculate(test_signal,1, 5);
+    auto ir_calc = rocor::GolayIRCalculator(golay_n);
+    auto ir = ir_calc.calculate(test_signal, 1, 5);
 
     ASSERT_NEAR(*test_ir.getReadPointer(0), *ir.getReadPointer(0), 0.01);
 }
