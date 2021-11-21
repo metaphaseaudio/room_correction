@@ -32,6 +32,7 @@ RoCorAudioProcessorEditor::RoCorAudioProcessorEditor(RoCorAudioProcessor& p)
     , m_SemiModalMask(juce::Colours::black.withAlpha(0.5f))
     , m_Tabs(juce::TabbedButtonBar::Orientation::TabsAtTop)
 {
+    setLookAndFeel(&m_LAF);
     m_FormatMgr.registerBasicFormats();
     setSize(400, 650);
     processor.addChangeListener(this);
@@ -72,7 +73,11 @@ RoCorAudioProcessorEditor::RoCorAudioProcessorEditor(RoCorAudioProcessor& p)
     addChildComponent(m_Progress);
 }
 
-RoCorAudioProcessorEditor::~RoCorAudioProcessorEditor() { processor.removeChangeListener(this); }
+RoCorAudioProcessorEditor::~RoCorAudioProcessorEditor()
+{
+    setLookAndFeel(nullptr);
+    processor.removeChangeListener(this);
+}
 
 //==============================================================================
 void RoCorAudioProcessorEditor::paint (Graphics& g)
@@ -146,6 +151,7 @@ void RoCorAudioProcessorEditor::buttonClicked(juce::Button* b)
     else if (b == &m_Save)
     {
         juce::FileChooser chooser ("Select directory");
+
         if (chooser.browseForDirectory())
             { processor.getIRCalc().saveIndividualImpulses(m_FormatMgr.getDefaultFormat(), chooser.getResult(), processor.getSampleRate()); }
     }

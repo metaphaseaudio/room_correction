@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.19)
+cmake_minimum_required(VERSION 3.17)
 
 project(ROCOR)
 set(ROCOR_VERSION_MAJOR 1)
@@ -14,6 +14,7 @@ add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/shared/vst3sdk)
 #------------------------------------------------------------------------------
 # Build the JUCE library
 #------------------------------------------------------------------------------
+add_definitions(-DJUCE_MODAL_LOOPS_PERMITTED=1)
 add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/shared/JUCE)
 #------------------------------------------------------------------------------
 # Build Metaphase Shared Libraries

@@ -10,3 +10,6 @@
 [submodule "src/shared/vst3sdk"]
 	path = src/shared/vst3sdk
 	url = https://github.com/steinbergmedia/vst3sdk.git
+[submodule "src/shared/jsoncpp"]
+	path = src/shared/jsoncpp
+	url = https://github.com/open-source-parsers/jsoncpp.git

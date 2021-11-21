@@ -9,6 +9,7 @@
 #include "../guts/RoCorAudioProcessor.h"
 #include "ThumbnailViewListBoxModel.h"
 #include "placement_map/PlacmentMapComponent.h"
+#include "RoCorLAF.h"
 
 
 class RoCorAudioProcessorEditor
@@ -38,6 +39,7 @@ public:
 
 private:
     RoCorAudioProcessor& processor;
+    RoCorLAF m_LAF;
 	juce::AudioFormatManager m_FormatMgr;
 	meta::WaveformComponent m_ImpulseView;
 

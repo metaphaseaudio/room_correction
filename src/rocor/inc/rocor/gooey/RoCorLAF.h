@@ -4,8 +4,8 @@
 #pragma once
 
 #include <juce_gui_basics/juce_gui_basics.h>
+#include <meta/gooey/MetaLookAndFeel.h>
 
 class RoCorLAF
-    : public juce::LookAndFeel_V4
-{
-};
+    : public meta::MetaLookAndFeel
+{};
